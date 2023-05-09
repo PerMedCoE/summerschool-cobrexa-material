@@ -79,6 +79,7 @@ knockout_fluxes = screen(
 using DataFrames, CSV
 
 df = DataFrame(gene = first.(knockout_fluxes))
+df.name = gene_name.(Ref(m), df.gene)
 df.fluxes = last.(knockout_fluxes)
 
 best_result = maximum(last.(knockout_fluxes))
