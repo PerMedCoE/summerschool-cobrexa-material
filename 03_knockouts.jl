@@ -41,10 +41,10 @@ sol["BIOMASS_Ec_iJO1366_core_53p95M"]
 # fast. We use Distributed package to run this over multiple processes:
 
 using Distributed
-addprocs(8)  # you may add more depending on your machine or cluster size
+#addprocs(8)  # you may add more depending on your machine or cluster size
 
 # load our stuff on the small cluster
-@everywhere using COBREXA, GLPK
+#@everywhere using COBREXA, GLPK
 
 # screen function allows us to run many analyses on a model with parallel, with
 # many optimizations related for distributed processing (e.g., data are only
@@ -88,3 +88,5 @@ df.essential = df.fluxes .<= essential_threshold
 df.interesting = (df.fluxes .< best_result * 0.999) .&& .!df.essential
 
 CSV.write("ko_report.csv", df)
+
+df
