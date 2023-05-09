@@ -1,0 +1,45 @@
+\defbeamertemplate*{frametitle}{permedcoe}[1][]
+{%\vskip3mm%
+  \begin{beamercolorbox}[wd=\paperwidth,sep=1em]{frametitle}%
+    \insertframetitle\par
+    \ifx\insertframesubtitle\@empty\else%
+      \begingroup
+        \usebeamercolor[fg]{subtitle}\usebeamerfont{subtitle}\par%
+        \insertframesubtitle
+      \endgroup\fi
+  \end{beamercolorbox}\vspace{-1em}\vspace{0.5ex}
+}
+
+\defbeamertemplate*{frame footer}{none}{}
+\defbeamertemplate{frame footer}{custom}[1]{ #1 }
+\defbeamertemplate{frame footer}{authordate}{\insertauthor{} --- \insertdate}
+
+\defbeamertemplate*{footline}{permedcoe}{%
+  \begin{beamercolorbox}[wd=\textwidth, sep=2ex]{subtitle}%
+    \ifbool{permedcoe@standout}{\hfill\usebeamertemplate{footer picture}}{%
+      \usebeamerfont{footer}%
+      \usebeamertemplate*{frame footer}
+      \hfill%
+      \usebeamertemplate*{frame numbering}
+    }
+  \end{beamercolorbox}%
+}
+\defbeamertemplate{footline}{empty}{}
+
+\defbeamertemplate*{footer picture}{permedcoe}{
+  \ifbool{permedcoe@standout}{%
+    \includegraphics[height=6ex]{media/permedcoe-icon-darkbg.pdf}}{%
+    \includegraphics[height=6ex]{media/permedcoe-icon-box.pdf}}
+}
+\defbeamertemplate{frame numbering}{none}{%
+  \usebeamerfont{page numbering}\usebeamertemplate{footer picture}}
+      
+\defbeamertemplate*{frame numbering}{permedcoe}{%
+  \usebeamerfont{page numbering}%
+  \usebeamercolor[fg]{page line}%
+  \begin{tikzpicture}
+  \node[inner sep=1ex] (pn) {{\usebeamerfont{current page}\usebeamercolor[fg]{current page}\insertframenumber} \usebeamercolor[fg]{page count}/\inserttotalframenumber};
+  \draw[line width=0.3ex] (pn.south west) -- (pn.south east);
+  \end{tikzpicture}
+  \usebeamertemplate{footer picture}
+}

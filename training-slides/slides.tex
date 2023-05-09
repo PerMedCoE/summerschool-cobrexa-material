@@ -1,0 +1,589 @@
+\documentclass[aspectratio=169]{beamer}
+
+\usetheme{permedcoe}
+
+\usepackage{qrcode}
+\usepackage{amsmath}
+
+\usetikzlibrary{positioning, fit, decorations.pathmorphing, decorations.pathreplacing, arrows.meta, calc}
+\tikzstyle{lwd}=[line width=.2ex]
+\tikzstyle{blk}=[rectangle,font=\condensed,text width=5em, align=center, inner sep=1ex]
+\tikzstyle{sblk}=[rectangle,font=\condensed\scriptsize,text width=4em, align=center, inner sep=1ex]
+\tikzstyle{arr}=[-{>[length=1ex]}]
+\def\mkMdl#1{%
+  \draw[decorate, decoration=zigzag] (#1.north west) to (#1.north east);
+  \draw[rounded corners=.5ex] (#1.north east) to (#1.south east) to (#1.south west) to (#1.north west);
+}
+
+\def\mkWrp#1{%
+  \draw[decorate, decoration=zigzag] (#1.north west) to (#1.north east);
+  \draw[decorate, decoration=zigzag] (#1.south west) to (#1.south east);
+  \draw (#1.north east) to (#1.south east);
+  \draw (#1.north west) to (#1.south west);
+}
+
+\def\mkAna#1{%
+  \draw[decorate, decoration=zigzag] (#1.south west) to (#1.south east);
+  \draw[rounded corners=.5ex] (#1.south east) to (#1.north east) to (#1.north west) to (#1.south west);
+}
+
+\title{Systematising complex and combined metabolic analyses with COBREXA.jl}
+\author{Mirek Kratochvíl (Uni.Lu), Daniel Thomas Lopez (EMBL EBI)}
+\date{Nov 15\textsuperscript{th} 2022}
+
+%\setbeamertemplate{frame footer}[authordate]
+\setbeamertemplate{frame footer}[custom]{Systematising analyses with COBREXA.jl\quad\insertdate}
+\setbeamertemplate{standout background}[permedcoe]
+
+\begin{document}
+\maketitle
+
+\setcounter{section}{-1}
+\section{Preparatory session}
+
+\begin{frame}{Check-list}
+\begin{itemize}
+\item Julia is installed
+\item COBREXA is installed
+\begin{enumerate}
+\item start Julia
+\item press \textbf{\Large\ttfamily ]} to activate packaging mode
+\item type \texttt{add COBREXA}
+\item return to normal mode using backspace
+\end{enumerate}
+\item at least one solver is installed (preferably GLPK)
+\item packages compile all right
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Test data}
+\begin{center}
+\verb|http://bigg.ucsd.edu/static/models/e_coli_core.json|
+
+(search engines: `BiGG E coli Core JSON')
+\end{center}
+\end{frame}
+
+\begin{frame}[fragile]{Test}
+\begin{verbatim}
+using COBREXA, GLPK
+
+download(
+  "http://bigg.ucsd.edu/static/models/e_coli_core.json",
+  "e_coli_core.json")
+
+model = load_model("e_coli_core.json")
+
+fluxes = flux_balance_analysis_dict(model, GLPK.Optimizer)
+\end{verbatim}
+\end{frame}
+
+{
+\renewcommand{\lastslidethanks}{See you on Nov 15\textsuperscript{th}!}
+\makelastslide{}
+}
+
+\section{What's and Why's}
+
+\begin{frame}{Constraint-based modeling (recap)}
+\begin{columns}
+\begin{column}{.7\linewidth}
+\begin{enumerate}
+\item Have some biochemical knowledge about processes in organisms
+\item Summarize the knowledge as a linear constrained model
+  \begin{itemize}
+    \item reactions convert metabolites to other metabolites
+    \item atoms are preserved
+  \end{itemize}
+\item Gather observations about your model using linear optimization machinery
+\end{enumerate}
+
+Main systematic problems:
+\begin{itemize}
+\item What is the best knowledge representation?
+\item How precise is the knowledge?
+\end{itemize}
+\end{column}
+\begin{column}{.3\linewidth}
+\begin{align*}
+\text{find}\quad\arg\max_x &\phantom{=} c^T x \\
+\text{such that}\quad S x &= 0 \\
+x &\geq u \\
+x &\leq l \\
+\end{align*}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{COBRA tool development}
+\begin{description}
+\item[Old times] Build the model from what you remember from school\&lab; directly use the LP solver.
+\item[Boxed analyses] Use precise model formats and several streamlined reconstruction procedures, enjoy some analyses implemented in COBRA toolboxes (COBRApy, matlab, \dots).
+\item[Extensibility] Use arbitrary model formats, construct any procedures and analyses from sensible reusable building blocks.
+\end{description}
+\end{frame}
+
+\begin{frame}{Main topics for today}
+\begin{itemize}
+\item Avoid long fragile analysis scripts
+\item Learn to `package' and `compose' things that happen in metabolic modeling
+\item Gain some side software-engineering benefits (efficiency, parallelization\&reentrancy, reproducibility, repurposability, transparency).
+\end{itemize}
+\end{frame}
+
+\section{COBREXA.jl Design Primer}
+
+\begin{frame}{What is a model?}
+\textbf{Traditional answer:} ``Representation of an organism that may or may not have genes, reactions, metabolites, biopolymers, annotations, gene-reaction associations, enzyme amounts, cell signaling state, \dots, preferably reflecting some reality and solving just right''
+
+\bigskip
+\textbf{COBREXA.jl view:} ``Anything we can convert to an annotated linear model''
+\end{frame}
+
+\begin{frame}[fragile]{Model types}
+\framesubtitle{Idea: Let's not care about the actual model type}
+\begin{columns}
+\begin{column}{.5\linewidth}
+Specialized model types:
+
+\begin{itemize}\tiny
+\item \verb|SBMLModel|
+\item \verb|MATModel|
+\item \verb|JSONModel|
+\item \verb|HDF5Model|
+\item \verb|StandardModel| (COBRApy-like)
+\item \verb|CoreModel| (core linear-algebraic model)
+\item \verb|GeckoModel|
+\item \verb|SMomentModel|
+\item \dots
+\end{itemize}
+
+Interfaces (abstract):
+\begin{itemize}\footnotesize
+\item \verb|MetabolicModel|
+\item \verb|ModelWrapper|
+\end{itemize}
+\end{column}
+\begin{column}{.5\linewidth}
+Accessors that work on all model types:
+\begin{itemize}\footnotesize
+\item \verb|reactions|, \verb|metabolites|
+\item \verb|stoichiometry|
+\item \verb|bounds|
+\item \verb|coupling|, \verb|coupling_bounds|
+\item \dots
+\end{itemize}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}[standout]
+Let's do a small demo of the method-based overloading mechanism\footnote{Not specific to Julia, you might know the same from C++, C\# TypeScript, Swift, Java, \dots} that makes this possible.
+\end{frame}
+
+\begin{frame}[fragile]{Systematization of Modifications and Analyses}
+\begin{itemize}\footnotesize
+\item \textbf{Model variants} are functions that takes a \verb|MetabolicModel| and produces another \verb|MetabolicModel| with some specific change applied.
+
+Possible examples: \verb|with_added_reaction|, \verb|with_removed_metabolite|, \verb|knockout_gene|, \verb|with_changed_bounds|, \verb|with_enzyme_crowding_bounds|, \verb|with_enzyme_usage_bounds| \dots
+
+\item \textbf{Analysis functions} take a \verb|MetabolicModel|, convert it into the optimizer language in some analysis-specific way, and run the analysis.
+
+Examples: \verb|flux_balance_analysis|, \verb|parsimonious_flux_balance_analysis|, \verb|minimize_metabolic_adjustment|, \dots
+
+\item \textbf{Optimizer modifications} are an additional concept added for efficiency, functions that take a model and its representation in the linear optimizer, and adjust the optimizer to do something differently.
+
+Possible examples: \verb|knockout|, \verb|add_enzyme_usage_constraints|, \verb|change_objective|, \verb|set_quadratic_objective|, \verb|set_optimizer_parameter|, \verb|add_loopless_constraints|, \dots
+
+\item \textbf{Meta-analysis functions} run analysis functions in multiple steps for a more complicated goal.
+
+Main example: \verb|screen|, derived examples: \verb|objective_envelope|, \verb|flux_variability_analysis|, \dots
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Systematization of Modifications and Analyses}
+\framesubtitle{Simplified view}
+\begin{itemize}
+\item \textbf{Model variants} \uncover<2>{\alert{--- can be chained without any danger}}
+\[\texttt{MetabolicModel} \to \texttt{MetabolicModel}\]
+\item \textbf{Analysis functions} \uncover<2>{\alert{--- applied at the end of chain}}
+\[\texttt{MetabolicModel} \to \text{result}\]
+\item \textbf{Optimizer modifications} \uncover<4>{\alert{--- must be chained carefully}}
+\[(\texttt{MetabolicModel}, \texttt{Optimizer}) \to \text{adjustments to the optimizer}\]
+\item \textbf{Meta-analysis functions} \uncover<3>{\alert{--- apply to `fork' the chain}}
+\[(\texttt{MetabolicModel}, \text{array of variants}, \text{analysis}) \to \text{array of results}\]
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Systematization example in a picture}
+\framesubtitle{A complicated scheme of knockout screening}
+\centering
+\begin{tikzpicture}[lwd]
+\begin{scope}[every node/.style={rotate=-90}]
+\node[blk] (a) {load MAT}; \mkMdl{a}
+\node[blk,above=0 of a] (b) {change objective}; \mkWrp{b}
+\node[blk,above=0 of b] (c) {add pathway}; \mkWrp{c}
+\node[blk,above=0 of c] (d) {\textcolor{permedcoe pink}{screen} $\forall {\color{green!66!gray}g}\in\textsc{Genes}$}; \mkWrp{d}
+\node[blk,above=0 of d] (e) {knock out gene \color{green!66!gray}$g$}; \mkWrp{e}
+\node[blk,above=0 of e] (f) {add loopless constraints}; \mkWrp{f}
+\node[blk,above=0 of f] (g) {run pFBA}; \mkAna{g}
+\end{scope}
+
+\draw[permedcoe pink,decorate, decoration={brace, amplitude=2ex}] (e.south west) to node[midway, anchor=south, yshift=2ex, color=permedcoe pink] {repeated for each gene} (g.north west);
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}{Systematization example in a picture}
+\framesubtitle{Backfitting data to lab measurements}
+\centering
+\begin{tikzpicture}[lwd]
+\begin{scope}[every node/.style={rotate=-90}]
+\node[blk] (a) {load HDF5}; \mkMdl{a}
+\node[blk,above=0 of a] (c) {change bounds}; \mkWrp{c}
+\node[blk,above=0 of c] (d) {\textcolor{permedcoe pink}{screen}\\\small $\forall {\color{green!66!gray}g_{1,2}}\in\textsc{Genes}$\\$\forall {\color{cyan!66!gray}p} \in \textsc{MSMS}$}; \mkWrp{d}
+\node[blk,above=0 of d] (e) {knock out genes \textcolor{green!66!gray}{$g_1$} and \textcolor{green!66!gray}{$g_2$}}; \mkWrp{e}
+\node[blk,above=0 of e] (f) {add GECKO constraints}; \mkWrp{f}
+\node[blk,above=0 of f] (f1) {change protein amount bounds\\to match \textcolor{cyan!66!gray}{$p$}}; \mkWrp{f1}
+\node[blk,above=0 of f1] (g) {run FBA, return growth}; \mkAna{g}
+\end{scope}
+
+\draw[permedcoe pink,decorate, decoration={brace, amplitude=2ex}] (g.north east) to node[midway, anchor=north, yshift=-2ex, color=permedcoe pink] {repeated many times} (e.south east);
+
+\node[below=1em of c.east, font=\footnotesize, align=center, text width=5em] (substr) {Substrate knowledge};
+\draw[arr] (substr) to (c);
+\node[below=4em of d.east, font=\footnotesize, align=center, text width=7em] (msms) {Mass spectrometry proteomics data};
+\draw[arr] (msms) to (d);
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}{The main goals today}
+\begin{enumerate}
+\item Get familiar with this system
+\item Use it for realistic tasks
+\item Write your own model variants/modifications
+\end{enumerate}
+\end{frame}
+
+\section{Exercises --- Basics}
+
+\begin{frame}[fragile]{Start up!}
+Load the E.~coli toy model (or the big one, it doesn't really matter), and find optimal production.
+
+You need:
+\begin{itemize}
+\item \verb|load_model|
+\item \verb|flux_balance_analysis_dict|
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Start up!}
+\framesubtitle{Manual vs.~named model modification}
+
+\begin{enumerate}
+\item \verb|convert| the model to a \verb|StandardModel|, restrict oxygen intake and see what happens.
+\item Restrict oxygen intake using \verb|change_constraint|
+\item Can the model live completely without oxygen? (glucose?)
+\end{enumerate}
+\end{frame}
+
+\begin{frame}[fragile]{Start up!}
+\framesubtitle{Modifications combine easily}
+How much CO\textsubscript{2} can the model produce given just $0.5 \frac{\text{mmol}}{\text{g}_{\text{DW}} \text{h}}$ oxygen?
+
+(use \verb|change_objective|)
+
+\bigskip
+What if we restrict some other intakes too?
+\end{frame}
+
+\begin{frame}[fragile]{Simple meta-analyses}
+\begin{itemize}
+\item Use \verb|flux_variability_analysis_dict| to explore variability in the reaction fluxes.
+\item \dots ensuring the model produces at least at 90\% of the original production.
+\item \dots given the oxygen intake is restricted.
+\item \dots and there is no glucose to ingest.
+\item \dots and gene with ID \texttt{b0727} (\emph{sucB}) is knocked out. (use \verb|knockout|)
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{SW engineering corner}
+\textbf{What \emph{are} these modification functions?}
+\pause
+Functions that return another functions.
+\bigskip\footnotesize
+\begin{itemize}
+\item Functions are the best (and likely only) means to freely \emph{parametrize the functionality} of code.
+\item Think about them as small recipes that the target function reads and knows what to do.
+\item You can easily make your own recipes to implement more functionality!
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Using functions as parameters}
+\textbf{Exercise:} \verb|bounds| parameter of FVA is actually also a `recipe' --- FVA gives it the optimal objective value it found, and expects to receive the bounds it should place on the objective. Try using \verb|objective_bounds| or \verb|gamma_bounds| manually.
+
+\bigskip
+\textbf{Task:} run a FVA that explores model production at \emph{precisely} 66\% of the optimum capacity.
+\end{frame}
+
+\begin{frame}[fragile]{Custom optimizer modification}
+Make a modification that uses \verb|change_constraint| to reduce limits of all reactions that require a certain gene by a given factor.
+
+Example use:
+\begin{verbatim}
+flux_balance_analysis_dict(m, GLPK.Optimizer, modifications = [
+  choke_gene_reactions("b0727", 0.5),
+])
+\end{verbatim}
+\end{frame}
+
+\section{Exercises --- Screening}
+
+\begin{frame}[fragile]{Screening}
+\verb|screen| function ``just'' runs an analysis over a huge amount of models generated from a single original model.
+
+\bigskip
+We found that pretty useful:
+\begin{itemize}
+\item parallelizes well
+\item you don't need to write possibly complicated cycles manually
+\item prevents programming errors
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Screening}
+\framesubtitle{Parameters of {\tt screen()}}
+\begin{itemize}
+\setlength{\itemindent}{0em}
+\setlength{\leftskip}{5em}
+\item model
+\item[\tt analysis=] a function to run on the model (possibly many times)
+\item[\tt args=] array of arguments to be passed to all function invocations
+\item[\tt variants=] array of variant chains to be applied to the base model before it is given to the analysis function
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Screening}
+Use \verb|screen| and \verb|change_constraint|\footnote{you may use also \texttt{change\_bound}, but that only works with mutable models} to see how much biomass can be produced depending on variable oxygen availability.\footnote{normally we would use \texttt{objective\_envelope}, which is optimized for this purpose}
+\end{frame}
+
+\begin{frame}[fragile]{Screening}
+\framesubtitle{Knocking out reactions}
+Use \verb|reactions| and \verb|change_constraint| to disable reactions, see what happens.
+
+\begin{itemize}
+\item what happens after choking the ATPM reaction?
+\item \dots and the biomass reaction?
+\end{itemize}
+\end{frame}
+
+\begin{frame}[standout]
+If everything went all right\footnote{the plan was naive and this timing is improbable}, we should have a break sometime around now.
+\end{frame}
+
+\begin{frame}[fragile]{Screening}
+\framesubtitle{Knocking out genes}
+Use \verb|knockout| to see what the model would look like without important genes.
+
+\bigskip
+\begin{itemize}
+\item make a list of genes that make the organism unable to grow
+\item \dots and that make the model completely infeasible
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Screening}
+\framesubtitle{Knocking out double genes}
+Run a double gene knockout screening on the model:
+\begin{itemize}
+\item make a matrix of gene combinations (let's not worry about duplicities now)
+\item careful about \verb|knockout| --- it is not associative!
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Screening}
+\framesubtitle{Choking all possible genes}
+Use the previously created modification to see what happens if you choke each of the genes by 10\%, 20\%, 30\%, \dots
+\end{frame}
+
+\begin{frame}[fragile]{A quick note about parallelization}
+COBREXA.jl was originally intended as a HPC runner of large screening-type analyses. Speeding up your analysis is thus quite trivial:
+
+\begin{enumerate}\small
+\item Add a few Julia ``worker'' processes to form a cluster
+  \begin{itemize}\scriptsize
+  \item locally, \verb|using Distributed; addprocs(10);|
+  \item on HPC, you can e.g.: \verb|using Distributed,ClusterManagers; addprocs_slurm(100);|
+  \end{itemize}
+  \dots you may check the available workers IDs by \verb|workers|
+\item load COBREXA and the solver everywhere: \verb|@everywhere using COBREXA, GLPK|
+  \item pass in argument \verb|workers| to parallelizable meta-analysis functions, such as:
+\begin{verbatim}flux_variability_analysis(m, GLPK.Optimizer, workers=workers())
+screen(m, analysis=..., args=..., workers=workers())\end{verbatim}
+  Since the problems are moreless embarassingly parallel, the analysis times should get (roughly) divided by worker count.
+\end{enumerate}
+\end{frame}
+
+\section{Modifying the modifications}
+
+\begin{frame}{How to make a model variant?}
+\begin{enumerate}
+\item Make a new structure to hold your model
+\item Load any information you need from parameters and the wrapped model
+\item Overload the accessors to provide the modified information
+\end{enumerate}
+
+Efficiency concerns:
+\begin{itemize}
+\item Source the least amount of stuff
+\item Modify/reconstruct only the data you really need to
+\item You can cache some precomputed items locally (models are immutable!)
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{\upshape\texttt{ModelWrapper}}
+\verb|ModelWrapper| is a subtype of \verb|MetabolicModel| that you can use to
+easily derive models from others.
+
+\begin{verbatim}
+struct MyTrivialModel <: ModelWrapper
+  inner :: MetabolicModel
+end
+
+COBREXA.unwrap_model(x::MyTrivialModel) = x.inner
+
+m = MyTrivialModel(load_model(...))
+flux_balance_analysis(m, GLPK.Optimizer)
+\end{verbatim}
+\end{frame}
+
+\begin{frame}[fragile]{Overriding parts of models}
+\begin{verbatim}
+struct ScaledModel <: ModelWrapper
+  inner::MetabolicModel
+  ratio::Float64
+end
+
+COBREXA.unwrap_model(x::ScaledModel) = x.inner
+COBREXA.bounds(x::ScaledModel) =
+  let (lbs, ubs) = bounds(x.inner)
+    (x.ratio .* lbs, x.ratio .* ubs)
+  end
+COBREXA.balance(x::ScaledModel) = x.ratio * balance(x.inner)
+
+m = ScaledModel(load_model(...), 0.5)
+flux_balance_analysis(m, GLPK.Optimizer)
+\end{verbatim}
+\end{frame}
+
+\begin{frame}[fragile]{Helpful bonus: Piping}
+\begin{verbatim}
+m = ScaledModel(load_model(...), 0.5)
+\end{verbatim}
+\dots is the same as\dots
+\begin{verbatim}
+m = load_model(...) |> ScaledModel(0.5)
+\end{verbatim}
+\end{frame}
+
+\section{Exercises --- Custom variants}
+
+\begin{frame}[standout]{Reminder}
+Why do we want to make model wrappers rather than optimizer modifications?
+\bigskip
+\begin{itemize}
+\item Models can be converted to SBML/JSON and saved.
+\item Well-constructed model wrappers chain indefinitely without any risks.
+\end{itemize} 
+\end{frame}
+
+\begin{frame}{Simple custom models}
+\framesubtitle{OmniColi magically receives ATP}
+Make a \emph{model wrapper} where ATP is constantly ``injected'' into otherwise normal model.
+
+\bigskip
+Possible approaches:
+\begin{itemize}
+\item change the balance vector
+\item add a reaction
+\end{itemize}
+(What are the benefits and downsides of both approaches?)
+\end{frame}
+
+\begin{frame}{Simple custom models}
+\framesubtitle{Reaction coupling utilization}
+Make a model where glucose and oxygen uptake is constrained to be the same (by molar amount) as carbon dioxide output.
+
+\bigskip
+Possible approaches:
+\begin{itemize}
+\item add an extra reaction
+\item use coupling
+\end{itemize}
+\end{frame}
+
+\begin{frame}{How to structure the community models?}
+\framesubtitle{Let's ferment some example bread}
+\begin{tikzpicture}[lwd]
+\begin{scope}[every node/.style={rotate=-45}]
+\node[sblk] (m1) {load \emph{S.~cerevisiae}}; \mkMdl{m1}
+\node[sblk] (m2) at (5em, 0) {load \emph{L.~lactis}}; \mkMdl{m2}
+\node[sblk] (m3) at (10em, 0) {load~rye~flour enzymes}; \mkMdl{m3}
+\end{scope}
+
+\begin{scope}[every node/.style={rotate=-90}]
+\node[blk] (a) at (16em,0) {make community}; \mkWrp{a}
+\node[blk,above=0 of a] (b) {\textcolor{permedcoe pink}{screen}\\\small $\forall {\color{orange!80!gray}c}\in S^2$}; \mkWrp{b}
+\node[blk,above=0 of b] (c) {constraint abundances to \textcolor{orange!80!gray}{$c$}}; \mkWrp{c}
+\node[blk,above=0 of c] (d) {compute envelope of \\ \mbox{CO\textsubscript{2}\,\texttimes\,lactate}}; \mkAna{d}
+\end{scope}
+
+\draw[arr] (m3.north) to[out=45,in=180] (a.south);
+\draw[arr] ($(m2.north)!.8!(m2.north west)$) to[out=45,in=170] ($(a.south)!.5!(a.south west)$);
+\draw[arr] ($(m1.north)!.8!(m1.north west)$) to[out=30,in=160] (a.south west);
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}{Making communities}
+\framesubtitle{Mutant E.~coli communities!}
+
+Make a model that contains several copies of the wrapped model, each with a different variant applied (e.g., with a knockout).
+
+\begin{itemize}
+\item simplifications:
+  \begin{itemize}
+  \item start with just N same models
+  \item we can ignore genes, annotations and other properties for now
+  \end{itemize}
+\item community members can be otherwise completely independent
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Making realistic communities}
+\framesubtitle{SteadyCom-style communities}
+
+Combine the reaction-rate balancing wrapper with the community wrapper to make a biomass-stable community.
+
+\begin{itemize}
+\item All submodels should produce the same amount of biomass.
+\item Bonus exercise: All submodels have their O\textsubscript{2} vs. CO\textsubscript{2} exchanges balanced (individually).
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Combining screenings with custom wrappers}
+\framesubtitle{SteadyEnvelope}
+Which glucose vs.~ammonia intake ratio is the best for our E.~coli?
+\end{frame}
+
+\frame[standout]{That's all for today.\par \fontsize{30pt}{30pt}\selectfont Time for questions?}
+
+\begin{frame}{Where to go next?}
+\begin{itemize}
+\item There is more functionality ready or being implemented. \\Check out COBREXA.jl docs and examples!
+\item If you make a useful wrapper, you can easily share it with the community.
+\item Try a HPC (perhaps one from EuroHPC's) for a really huge analysis.
+\end{itemize}
+\end{frame}
+
+\makelastslide{}
+
+\end{document}

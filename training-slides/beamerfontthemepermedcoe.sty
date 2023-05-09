@@ -1,0 +1,45 @@
+\RequirePackage{fontspec}
+\RequirePackage{microtype}
+
+\RequirePackage{cmbright}
+%\RequirePackage{firamath} %alternative
+
+\setmainfont{Roboto Slab Light}
+\setsansfont[ItalicFont={Roboto Light Italic},%
+             BoldFont={Roboto Bold},%
+             BoldItalicFont={Roboto Bold Italic}]%
+            {Roboto Light}%
+\setmonofont{RobotoMonoLight}[
+  ItalicFont=RobotoMonoLightItalic,
+  BoldFont=RobotoMonoBold,
+  BoldItalicFont=RobotoMonoBoldItalic,
+  Scale=0.86]
+\newfontfamily\condensed{RobotoCondensedLight}[
+  ItalicFont=RobotoCondensedLightItalic,
+  BoldFont=RobotoCondensedBold,
+  BoldItalicFont=RobotoCondensedBoldItalic]
+
+\setbeamerfont{title}{size=\Huge, series=\bfseries, shape=\scshape}
+\setbeamerfont{author}{size=\normalsize, shape=\scshape}
+\setbeamerfont{date}{size=\footnotesize, shape=\scshape}
+\setbeamerfont{section title}{size=\Huge, series=\bfseries, shape=\scshape}
+\setbeamerfont{section number}{size=\Huge}
+\setbeamerfont{block title}{size=\normalsize, series=\bfseries, shape=\scshape}
+\setbeamerfont{block title alerted}{parent={block title}}
+\setbeamerfont*{subtitle}{size=\footnotesize, shape=\scshape}
+\setbeamerfont*{footer}{parent=subtitle, size=\tiny}
+\setbeamerfont{frametitle}{size=\large, shape=\scshape}
+\setbeamerfont{caption}{size=\small}
+\setbeamerfont{caption name}{series=\bfseries, shape=\scshape}
+\setbeamerfont{description item}{series=\bfseries}
+\setbeamerfont{page numbering}{size=\scriptsize}
+\setbeamerfont{current page}{size=\footnotesize}
+\setbeamerfont{bibliography entry author}{size=\normalsize, series=\normalfont}
+\setbeamerfont{bibliography entry title}{size=\normalsize, series=\bfseries}
+\setbeamerfont{bibliography entry location}{size=\normalsize, series=\normalfont}
+\setbeamerfont{bibliography entry note}{size=\small, series=\normalfont}
+\setbeamerfont{standout}{size=\Large, series=\bfseries}
+\setbeamerfont{last slide thanks}{size=\Huge, series=\bfseries, shape=\scshape}
+\setbeamerfont{last slide title}{size=\normalsize, shape=\scshape}
+\setbeamerfont{last slide author}{size=\footnotesize, shape=\scshape}
+\setbeamerfont{last slide date}{size=\footnotesize, shape=\scshape}

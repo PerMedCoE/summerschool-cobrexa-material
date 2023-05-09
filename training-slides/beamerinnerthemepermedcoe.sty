@@ -1,0 +1,163 @@
+
+\RequirePackage{etoolbox}
+
+\def\permedcoe@network{network}
+\def\permedcoe@fingerprint{fingerprint}
+\def\permedcoe@black{black}
+\def\permedcoe@white{white}
+
+\def\permedcoe@background{} %TODO convert this to pgfkeys
+\def\setpermedcoebackground#1{\def\permedcoe@background{#1}}
+
+\define@key{beamerframe}{c}[true]{% centered
+  \beamer@frametopskip=0pt plus 1fill\relax%
+  \beamer@framebottomskip=0pt plus 1fill\relax%
+  \beamer@frametopskipautobreak=0pt plus .4\paperheight\relax%
+  \beamer@framebottomskipautobreak=0pt plus .6\paperheight\relax%
+  \def\beamer@initfirstlineunskip{}%
+}
+
+\providebool{permedcoe@standout}
+\define@key{beamerframe}{standout}[true]{%
+  \booltrue{permedcoe@standout}
+  \begingroup
+  \setbeamercolor*{titlelike}{use=standout, fg=standout.fg} %TODO check
+  \setbeamercolor*{structure}{use=standout, fg=standout.fg}
+  \setbeamercolor*{footnote}{parent=standout}
+  \setkeys{beamerframe}{c}
+  %\setkeys{beamerframe}{noframenumbering}
+  \centering %TODO check
+  \usebeamercolor[fg]{standout}
+  \usebeamerfont{standout}
+}
+
+\apptocmd{\beamer@reseteecodes}{%
+  \ifbool{permedcoe@standout}{
+    \endgroup
+    \boolfalse{permedcoe@standout}
+  }{}
+}{}{}
+
+\defbeamertemplate*{standout background}{plain}{
+  \usebeamercolor{standout}
+  \fill[color=bg] (0,0) rectangle (\the\paperwidth,\the\paperheight);
+}
+
+\defbeamertemplate{standout background}{permedcoe}{
+  \usebeamercolor{standout}
+  \node[anchor=north,inner sep=0,line width=0] at (current page.north) {\includegraphics[width=\the\paperwidth]{media/bg-standout.jpg}};
+}
+
+\setbeamertemplate{background}{%
+  \begin{tikzpicture}
+  \useasboundingbox (0,0) rectangle(\the\paperwidth,\the\paperheight);
+  \ifbool{permedcoe@standout}{
+    \usebeamertemplate{standout background}
+  }{%
+  \ifx\permedcoe@background\permedcoe@network
+    \node[inner sep=0pt] at (current page.center) {\includegraphics[width=\paperwidth]{media/bg-graph.jpg}};
+  \else\ifx\permedcoe@background\permedcoe@fingerprint
+    \node[inner sep=0pt] at (current page.center) {\includegraphics[width=\paperwidth]{media/bg-fp.jpg}};
+  \else\ifx\permedcoe@background\permedcoe@white
+    \path[fill=white] (0,0) rectangle (\the\paperwidth,\the\paperheight);
+  \else\ifx\permedcoe@background\permedcoe@black
+    \path[fill=black] (0,0) rectangle (\the\paperwidth,\the\paperheight);
+  \else
+    \usebeamercolor{normal text}
+    \fill[color=bg] (0,0) rectangle (\the\paperwidth,\the\paperheight);
+  \fi\fi\fi\fi}
+  \end{tikzpicture}
+}
+
+\defbeamertemplate*{section page}{permedcoe}{
+  \begin{beamercolorbox}{section number}
+    \usebeamerfont{section number}\insertsectionnumber
+  \end{beamercolorbox}\bigskip
+  \begin{beamercolorbox}{section title}
+    \usebeamerfont{section title}\insertsectionhead
+  \end{beamercolorbox}
+}
+
+\let\origmaketitle\maketitle
+\def\maketitle{\begingroup%
+  \setpermedcoebackground{fingerprint}%
+  \setbeamertemplate{footline}[empty]%
+  \frame[plain,noframenumbering]{\titlepage}
+  \endgroup}
+
+\AtBeginSection{
+  \ifbeamer@inframe
+    \sectionpage
+  \else
+    \begingroup
+    \setpermedcoebackground{fingerprint}
+    \frame[plain,noframenumbering]{\sectionpage}
+    \endgroup
+  \fi
+}
+
+\newcommand{\permedcoeEUthanks}{The PerMedCoE project has received funding from the European Union’s Horizon 2020 research and innovation programme under the grant agreement Nº951773}
+
+\defbeamertemplate*{title page}{permedcoe}
+{ 
+  \begin{center}\includegraphics[height=10ex]{media/permedcoe-big.pdf}\end{center}
+  \vfill
+  \begin{beamercolorbox}[center]{title page header}
+    \usebeamerfont{title}\inserttitle
+  \end{beamercolorbox}\vspace{1ex}
+  \begin{beamercolorbox}[center]{author}
+    \usebeamerfont{author}\insertauthor
+  \end{beamercolorbox}
+  \begin{beamercolorbox}[center]{date}
+    \usebeamerfont{date}\insertdate
+  \end{beamercolorbox}
+  \vfill
+  \begin{center}
+  \parbox{3em}{\includegraphics[width=\linewidth]{media/eu-flag.pdf}}\quad\parbox{14em}{\hyphenpenalty=10000\relax\tiny\permedcoeEUthanks}
+  \end{center}
+}
+
+\newcommand{\lastslidethanks}{Thank you!}
+\newcommand{\lastslidelogos}{\vspace{0.5\paperheight}}
+\newcommand{\makelastslide}{%
+  \begingroup
+  \setpermedcoebackground{network}
+  \begin{frame}[plain,noframenumbering]
+  \begin{columns}
+  \begin{column}{.6\textwidth}
+  \raggedright
+  \begin{beamercolorbox}{last slide thanks}%
+    \usebeamerfont{last slide thanks}\lastslidethanks
+  \end{beamercolorbox}\par\smallskip
+  \begin{beamercolorbox}{last slide title}%
+    \usebeamerfont{last slide title}\inserttitle
+  \end{beamercolorbox}\par\smallskip
+  \begin{beamercolorbox}{last slide author}%
+    \usebeamerfont{last slide author}\insertauthor
+  \end{beamercolorbox}\par\smallskip
+  \begin{beamercolorbox}{last slide date}%
+    \usebeamerfont{last slide date}\insertdate
+  \end{beamercolorbox}\par\bigskip
+  Follow us in social media:\par\medskip
+  \includegraphics[height=5ex]{media/twitter.pdf}\hspace{1ex}%
+  \includegraphics[height=5ex]{media/linkedin.pdf}\hspace{1ex}%
+  \includegraphics[height=5ex]{media/youtube.pdf}\par
+  {\footnotesize \texttt{linkedin.com/company/permedcoe}\par
+  \textbf{@permedcoe}\par}
+  \bigskip
+  \parbox{0.3\linewidth}{\includegraphics[width=\linewidth]{media/eu-flag.pdf}}\quad\parbox{0.63\linewidth}{\hyphenpenalty=10000\relax\scriptsize\permedcoeEUthanks}
+  \end{column}
+  \begin{column}{.4\textwidth}
+  \centering
+  \includegraphics[height=10ex]{media/permedcoe-big.pdf}\par
+  \texttt{www.permedcoe.eu}
+  \vfill
+  \lastslidelogos
+  \end{column}
+  \end{columns}
+  \end{frame}
+  \endgroup
+}
+
+\setbeamertemplate{itemize items}{\textbullet}
+\setlength{\parskip}{0.5ex}
