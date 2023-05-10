@@ -4,6 +4,7 @@ CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 GLPK = "60bf3e95-4087-53dc-ae20-288a0d20c6a6"
 Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
+SCIP = "82193955-e24f-5292-bf16-6f2c5261a85f"
 
 [compat]
 COBREXA = "1"

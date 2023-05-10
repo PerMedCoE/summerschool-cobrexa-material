@@ -1,0 +1,27 @@
+
+
+- write up a simple commandline tutorial for how to get the environment started
+- install a solver
+
+- have a look at how jupyter notebooks work with julia
+  - add IJulia to dependencies
+  - fix the kernel issue somehow
+  - might be nice to check if the older kernels work
+
+- be less brutal on the reaction creation
+
+- add links to the documentation
+
+- 1st tutorial: run a FBA on the simple model
+  (also requires creating an objective)
+
+- export JSON for Escher
+
+- Add code for manually doing the knockouts and gene regulation
+  - add it to additional notebook
+
+- provide a snippet for seeing which reactions "work" with a certain gene
+
+- add SCIP to dependencies
+
+
