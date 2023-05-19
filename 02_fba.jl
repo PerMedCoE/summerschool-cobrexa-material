@@ -1,4 +1,8 @@
 
+# Install the packages if they are not installed yet
+import Pkg
+Pkg.add(["COBREXA", "GLPK"])
+
 using COBREXA
 
 # Let's download and open a big model
@@ -9,16 +13,14 @@ m = load_model(StandardModel, "ecoli.json");
 # ...we've opened it as StandardModel right away to allow easy manual
 # modifications.
 
-# let's have a look at the genes
-m.genes["b0722"]
-
 # see the objective function
 objective(m) # gives a sparse vector that maximizes a single reaction
 reactions(m)[19] # the number may differ
 
-# see the exchanges.
-# Unfortunately the standard depends on prefixing the reaction ID with EX_, so
-# at least we can filter the reactions to them.
+# See the exchanges.
+# Unfortunately, instead of proper annotation the "standard" for identifying
+# exchange reactions now depends on prefixing the reaction ID with EX_, so at
+# least we can filter them out by checking the prefixes.
 exchanges = filter(startswith("EX_"), reactions(m))
 
 exchanges .=> reaction_name.(Ref(m), exchanges)
@@ -37,9 +39,12 @@ sol["BIOMASS_Ec_iJO1366_core_53p95M"]  # (it is possible to tab through the dict
 flux_summary(sol)
 # (this guesses the exchange/biomass status based on reaction IDs)
 
-# or write the result to a file for future use
+# ...or write the result to a file for future use. First, let's create a data frame:
+Pkg.add(["DataFrames", "CSV"])
 using DataFrames, CSV
 df = DataFrame(reaction = collect(keys(sol)), flux = collect(values(sol)))
+
+# ...and write the CSV:
 CSV.write("mysolution.csv", df)
 
 # Let's choke the model a bit, reducing the availbale oxygen and sugar
@@ -49,13 +54,15 @@ sol = flux_balance_analysis_dict(m, GLPK.Optimizer)
 sol["BIOMASS_Ec_iJO1366_core_53p95M"] # less growth
 
 # allow eating acetate instead
-m.reactions["EX_ac_e"].lb = -100;
-sol = flux_balance_analysis_dict(m, GLPK.Optimizer);
+m.reactions["EX_ac_e"].lb = -100
+sol = flux_balance_analysis_dict(m, GLPK.Optimizer)
 sol["BIOMASS_Ec_iJO1366_core_53p95M"] # a lot of growth again
 
-# at this point, it is clear that the original model data has been overwritten
-# so it might be much better to do this stuff reproducibly. COBREXA has
-# modifications for that purpose.
+# At this point, the original model data has been overwritten and there's no
+# telling which bounds are still from the original model or which have been
+# modified. For many reasons it is better to do this stuff without breaking the
+# model internals manually, and COBREXA has a system of "analysis
+# modifications" for that purpose:
 m = load_model(StandardModel, "ecoli.json");
 sol = flux_balance_analysis_dict(
     m,
@@ -66,6 +73,31 @@ sol = flux_balance_analysis_dict(
     ],
 );
 sol["BIOMASS_Ec_iJO1366_core_53p95M"]
-#...this scales much better if you need to do more stuff.
+#...this scales much better if you need to try more stuff. Other modifications
+# include e.g. `change_objective`, `silence` for shutting down the output from
+# overly verbose solvers (such as OSQP), and `change_optimizer_attribute` for
+# tuning the optimizer behavior.
 
-# Escher plotting is available via https://github.com/stelmo/Escher.jl
+# There is a nice app at https://escher.github.io/ that allows us to visualize
+# and browse the solutions to metabolic models. You can load the visualization
+# of this model as Map: "Core metabolism (e_coli_core)" and Tool: "Viewer".
+# 
+# Let's produce a JSON file with our solution that we can upload:
+
+Pkg.add("JSON")
+using JSON
+
+write(
+    "mysolution.json", 
+    JSON.json(
+        sol, # the solution
+        2, # make the JSON human-readable by using 2-space indentation, instead of optimizing for size
+    )
+)
+
+# You can now upload the file `mysolution.json` to the Escher viewer via
+# `Data → Load reaction data`
+# to see the fluxes visualized.
+
+# More configurable Escher plotting directly from Julia to files (PDF, PNG) is
+# available via https://github.com/stelmo/Escher.jl
