@@ -7,25 +7,24 @@ using COBREXA
 # Let's download and open the big model again
 import Downloads
 Downloads.download("http://bigg.ucsd.edu/static/models/iJO1366.json", "ecoli.json")
-m = load_model(StandardModel, "ecoli.json");
+model = load_model(StandardModel, "ecoli.json");
 
 # Main reference is this:
 # https://lcsb-biocore.github.io/COBREXA.jl/stable/examples/07_gene_deletion/
 #
 # Each reaction has a gene association, which dictates the gene products that
 # need to be available so that the reaction can "run".
-genes(m)
+genes(model)
 
-grr = reaction_gene_association(m, "PFK")
+gene_rules_dnf = reaction_gene_association(model, "PFK")
 
 # The result is in DNF for (computational) simplicity; the rules can be
 # converted e.g. to Strings which are more suitable for reading:
-COBREXA._unparse_grr(String, grr)
+COBREXA._unparse_grr(String, gene_rules_dnf)
 
 # We might knock out genes by running through the reactions and evaluating DNF.
 # The knockout is available as a modification for simplicity:
-
-gene_name(m, "b0720")
+gene_name(model, "b0720")
 
 # We need a solver
 Pkg.add("GLPK")
@@ -33,7 +32,7 @@ Pkg.add("GLPK")
 # Run the knockout (implemented as an analysis modification for convenience)
 using GLPK
 sol = flux_balance_analysis_dict(
-    m,
+    model,
     GLPK.Optimizer,
     modifications = [knockout("b0720")],
 )
@@ -43,8 +42,8 @@ sol["BIOMASS_Ec_iJO1366_core_53p95M"]
 
 # We can screen through all genes. One could simply write something like:
 [
-    flux_balance_analysis_dict(m, GLPK.Optimizer, modifications = [knockout(g)]) for
-    g in genes(m)[1:10]
+    flux_balance_analysis_dict(model, GLPK.Optimizer, modifications = [knockout(g)]) for
+    g in genes(model)[1:10]
 ]
 # ...but that might be slow for larger amounts of genes, and we would like to
 # add some special handling for knockouts where there is no feasible solution
@@ -64,10 +63,10 @@ using Distributed
 # only moved once).
 
 knockout_fluxes = screen(
-    m, # the model which we process
-    args = tuple.(genes(m)[1:10]), # all argument lists for the analyses
-    analysis = (m, gene) -> # the analysis function ("lambda") that we want to run on the cluster for each item from the argument list
-        flux_balance_analysis_dict(m, GLPK.Optimizer, modifications = [knockout(gene)]),
+    model, # the model which we process
+    args = tuple.(genes(model)[1:10]), # all argument lists for the analyses
+    analysis = (model, gene) -> # the analysis function ("lambda") that we want to run on the cluster for each item from the argument list
+        flux_balance_analysis_dict(model, GLPK.Optimizer, modifications = [knockout(gene)]),
     workers = workers(), # this gives it the list of worker nodes to use
 )
 
@@ -77,10 +76,10 @@ knockout_fluxes = screen(
 # Now that we see that it works, let's post-process the results a little, and
 # also add more genes:
 knockout_fluxes = screen(
-    m,
-    args = tuple.(genes(m)[1:50]),
-    analysis = (m, gene) -> begin
-        res = flux_balance_analysis_dict(m, GLPK.Optimizer, modifications = [knockout(gene)])
+    model,
+    args = tuple.(genes(model)[1:50]),
+    analysis = (model, gene) -> begin
+        res = flux_balance_analysis_dict(model, GLPK.Optimizer, modifications = [knockout(gene)])
         if !isnothing(res)
             gene => res["BIOMASS_Ec_iJO1366_core_53p95M"]
         else
@@ -98,7 +97,7 @@ Pkg.add(["DataFrames","CSV"])
 using DataFrames, CSV
 
 df = DataFrame(gene = first.(knockout_fluxes))
-df.name = gene_name.(Ref(m), df.gene)
+df.name = gene_name.(Ref(model), df.gene)
 df.fluxes = last.(knockout_fluxes)
 df
 
@@ -124,7 +123,7 @@ CSV.write("ko_report.csv", df)
 # closely corresponds to the biological meaning of gene units that form
 # interchangeable complexes. You can access them using the `grr` field in
 # Reaction structures:
-m.reactions["RNDR2"].grr
+model.reactions["RNDR2"].grr
 
 # Here, the reaction can be supported by either of the 2 possibilities (enzyme
 # complexes) where the first possibility is built from gene products of genes
@@ -132,23 +131,23 @@ m.reactions["RNDR2"].grr
 # `b3781` instead of the `b2582`.
 
 # We may list all GRRs simply by iterating through the model reactions:
-[rid => r.grr for (rid,r) in m.reactions]
+[rid => r.grr for (rid,r) in model.reactions]
 
 # It is often interesting to ask which reactions may depend on which gene, we
 # can make a convenience function for that:
 reactions_of_gene(model, gene) =
   [rid for (rid,r) in model.reactions if !isnothing(r.grr) && any(complex -> any(contains(gene), complex), r.grr)]
 
-reactions_of_gene(m, "b1064")
+reactions_of_gene(model, "b1064")
 
 # Using the vector notation is quite convenient for creating lists that allow
 # us to get an overview of the situation:
-gene_name.(Ref(m), genes(m)) .=> reactions_of_gene.(Ref(m), genes(m))
+gene_name.(Ref(model), genes(model)) .=> reactions_of_gene.(Ref(model), genes(model))
 
 # Now, given a set of genes that we want to knock out, we can manually find if
 # a given reaction will still work or not. Let's try on RNDR1:
 
-grr = m.reactions["RNDR1"].grr
+grr = model.reactions["RNDR1"].grr
 
 ko_genes = ["b2234"]
 
@@ -190,14 +189,14 @@ end
 # Now, we can manually modify the model to disable the reactions that would be
 # knocked out by a certain gene combination:
 ko_genes = ["b2582", "b3781"]
-for (rid, r) = m.reactions
-    if is_reaction_knocked_out(m, rid, ko_genes)
+for (rid, r) = model.reactions
+    if is_reaction_knocked_out(model, rid, ko_genes)
         r.lb = r.ub = 0.0
     end
 end
 
 # Does the model still grow?
-sol = flux_balance_analysis_dict(m, GLPK.Optimizer)
+sol = flux_balance_analysis_dict(model, GLPK.Optimizer)
 sol["BIOMASS_Ec_iJO1366_core_53p95M"]
 
 # ...which seems like the combination of the 2 genes was not essential at all.

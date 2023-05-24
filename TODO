@@ -5,16 +5,3 @@
   - add it to additional notebook
 
 - if possible, try to default to Julia-1.6.7 notebook
-
-- function to print the reactions nicely
-
-- Exercise: load Human1 (GEM) or Recon3D and run a FVA on it using MN
-- Exercise: Do a triple gene knockout on iJO1366 using MN
-
-- change all m's to model
-
-- add the picture of Miguel's toy model to the 1st notebook
-
-- print how one of the reactions formats with the → formula
-
-- move the dataframe right to the 1st notebook
