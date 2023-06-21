@@ -53,10 +53,10 @@ sol["BIOMASS_Ec_iJO1366_core_53p95M"]
 # use Distributed package to run this over multiple processes:
 
 using Distributed
-#addprocs(8)  # you may add more depending on your machine or cluster size
+#addprocs(8)  # only add processes if you are sure that you have sufficient resources available!
 
 # load our stuff on the small cluster
-#@everywhere using COBREXA, GLPK
+#@everywhere using COBREXA, GLPK # only necessary if you added the extra processes
 
 # `screen` function allows us to run many analyses on a model with parallel,
 # with many optimizations related for distributed processing (e.g., data are
