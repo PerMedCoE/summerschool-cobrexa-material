@@ -200,3 +200,44 @@ sol = flux_balance_analysis_dict(model, GLPK.Optimizer)
 sol["BIOMASS_Ec_iJO1366_core_53p95M"]
 
 # ...which seems like the combination of the 2 genes was not essential at all.
+
+# ## How well do the in-silico knockouts compare to real measurements?
+#
+# Since there are existing measurements of what happens with real E. Coli after
+# knockouts, we can look at our results as predictions, and compare them to the
+# ground truth with the usual statistical means.
+#
+# First, let's read the experimentally verified "lethal" knockout genes from
+# the supplied JSON data file
+
+using JSON
+
+# This is the list of lethal gene knockouts:
+ex_lethal = JSON.parsefile("data/m9_invivo_lethals.json")
+
+# Let's convert it to vectorized representation for the dataframe:
+df.invivo_essential = in.(df.gene, Ref(ex_lethal))
+
+df.insilico_essential = df.essential #rename for clarity
+
+# Now we can count true&false positives&negatives:
+
+TP = count(df.insilico_essential .& df.invivo_essential);
+TN = count(.!df.insilico_essential .& .!df.invivo_essential);
+FP = count(.!df.insilico_essential .& df.invivo_essential);
+FN = count(df.insilico_essential .& .!df.invivo_essential);
+
+# Let's arrange these in a standard confusion matrix:
+
+confusion_mtx = [
+    TP FN
+    FP TN
+]
+
+# This allows us to compute some useful metrics about the predictions:
+(
+    sensitivity = TP / (TP + FN),
+    specificity = TN / (TN + FP),
+    accuracy = (TP + TN) / sum(confusion_mtx),
+    f1_score = (2 * TP) / (2 * TP + FN + FP),
+)
